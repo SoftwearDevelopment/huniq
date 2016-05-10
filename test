@@ -1,0 +1,50 @@
+#! /bin/bash
+
+FAIL=0
+
+report() {
+  if (( "$FAIL" == 0 )); then
+    echo >&2 "tests succeeded!"
+  else
+    echo >&2 "tests failed!"
+    exit 11
+  fi
+}
+trap report EXIT
+
+DIR="$(dirname "$0")"
+HUNIQ="${DIR}/huniq"
+
+huniq() {
+  "$HUNIQ" "$@" || {
+    echo >&2 "huniq returned non zero exit code: $?"
+    (( FAIL += 1 ))
+  }
+}
+
+assert_out() {
+  # Note: base64 catching newline errors
+  local ref="$(printf "$1" | base64)"; shift
+  local res="$(huniq "$@" | sort | base64)"
+  test "$ref" = "$res" || {
+    echo >&2 "Expected huniq to print (base64) $ref but it printed $res"
+    (( FAIL += 1 ))
+  }
+}
+
+assert_io() {
+  local s="$1"; shift
+  printf "$s" | assert_out "$@"
+}
+
+assert_out ""    </dev/null
+assert_out "" -c </dev/null
+
+assert_io  "" ""
+assert_io  "" "" -c
+
+yes foo | head -n 20 | assert_out "foo\n"
+yes foo | head -n 20 | assert_out "20  foo\n" -c
+
+assert_io "a\nb\nb\na\nc" "a\nb\nc\n"
+assert_io "a\nb\nb\na\nc" "1  c\n2  a\n2  b\n" -c
