@@ -13,8 +13,8 @@ counted.
 
 # why?
 
-This is useful for replacing the `sort | uniq -c` pattern
-in cases where the input is very large (larger than ram)
+This is useful for replacing the `sort | uniq -c` or `sort -u`
+pattern in cases where the input is large (possibly larger than ram)
 but the uniqed output is mach smaller:
 
 The sort step above needs to load the entire input data into
@@ -22,6 +22,9 @@ memory, so the amount of memory is roughly equal to the size
 of the input data. huniq already deduplicates the data in
 memory, so it's memory requirement is roughly equal to that
 of the deduped output.
+
+Huniq is usually also faster than `sort -u` when there are many
+duplicates.
 
 Note that huniq generally has no advantage to just using
 `uniq` without the sort, since uniq just removes consecutive

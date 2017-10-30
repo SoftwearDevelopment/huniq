@@ -1,8 +1,10 @@
-#include <unordered_map>
-#include <unordered_set>
 #include <iostream>
 #include <string>
 #include <utility>
+
+#include <tsl/sparse_map.h>
+#include <tsl/sparse_set.h>
+
 
 void help() {
   // TODO: Can we somehow extract this from the readme?
@@ -41,7 +43,7 @@ void help() {
 }
 
 template<typename T>
-struct uniq_set : std::unordered_set<T> {
+struct uniq_set : tsl::sparse_set<T> {
   template<typename Arg>
   void add(Arg&& arg) {
     this->insert(std::forward<Arg>(arg));
@@ -49,12 +51,13 @@ struct uniq_set : std::unordered_set<T> {
 };
 
 template<typename T>
-struct count_uniq_set : std::unordered_map<T, size_t> {
+struct count_uniq_set : tsl::sparse_map<T, size_t> {
   template<typename Arg>
   void add(Arg&& arg) {
-    auto r = this->insert(std::make_pair(std::forward<Arg>(arg), 0));
+    auto r = this->try_emplace(std::forward<Arg>(arg), 0);
     auto &pair  = *(std::get<0>(r));
-    auto &count = std::get<1>(pair);
+    auto &count = const_cast<size_t&>(std::get<1>(pair));
+    // TODO: Why is the const_cast necessary?
     count++;
   }
 };
