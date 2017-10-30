@@ -1,7 +1,10 @@
-CXXFLAGS ?= -O2
+CXXFLAGS ?= -O3
 
-huniq:
-	$(CXX) huniq.cc $(CXXFLAGS) $(LDFLAGS) -Wextra -Wpedantic -Werror -std=c++11 -o huniq -I"$(PWD)/vendor/tsl-sparse-map/"
+huniq: huniq.cc
+	$(CXX)  $(CXXFLAGS) $(LDFLAGS) -Wextra -Wpedantic -Werror -std=c++11 \
+		-I"$(PWD)/vendor/tsl-sparse-map/" -I"$(PWD)/vendor/metrohash/src/" \
+		huniq.cc vendor/metrohash/src/metrohash128.cpp -o huniq
+
 
 .PHONY: clean test
 

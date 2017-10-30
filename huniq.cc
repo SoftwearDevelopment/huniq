@@ -1,10 +1,12 @@
 #include <iostream>
 #include <string>
 #include <utility>
+#include <array>
 
 #include <tsl/sparse_map.h>
 #include <tsl/sparse_set.h>
 
+#include <metrohash128.h>
 
 void help() {
   // TODO: Can we somehow extract this from the readme?
@@ -24,41 +26,39 @@ void help() {
     "\n"
     "\n# why?"
     "\n"
-    "\nThis is useful for replacing the `sort | uniq -c` pattern"
-    "\nin cases where the input is very large (larger than ram)"
-    "\nbut the uniqed output is mach smaller:"
+    "\nThis is useful for replacing the `sort | uniq -c`, `sort | uniq` or `sort -u`"
+    "\nin cases where sorting is not required."
     "\n"
-    "\nThe sort step above needs to load the entire input data into"
-    "\nmemory, so the amount of memory is roughly equal to the size"
-    "\nof the input data. huniq already deduplicates the data in"
-    "\nmemory, so it's memory requirement is roughly equal to that"
-    "\nof the deduped output."
+    "\n`huniq -c` and `huniq` are both generally faster and use less memory than"
+    "\ntheir counterparts, this is achieved by using a couple of optimizations:"
+    "\n"
+    "\nA hash table is used to store duplicates instead of sorting the input;"
+    "\nthis increases performance, since hashing is usually faster than sorting."
+    "\nIt also means that duplicates do not have to be stored individually (they"
+    "\nall occupy the same hash bucket), so the memory requirements grow with the"
+    "\nsize of the output and not the input. E.g. if each line in the input has a"
+    "\none duplicate at average, we need 50% less memory."
+    "\n"
+    "\n`huniq` also does not store the actual lines themselves, instead it just stores"
+    "\na hash value (16 byte each) of that line. This is especially very useful when very"
+    "\nlong lines are in the input."
+    "\n"
+    "\n`huniq` outputs lines in the order they where given, while `huniq -c` returns lines"
+    "\nin arbitrary order."
+    "\nhuniq does not swap data to disk like gnu sort does, so for that reason it sometimes"
+    "\nalso uses more memory than sort, especially when there are many items and not many duplicates."
     "\n"
     "\nNote that huniq generally has no advantage to just using"
     "\n`uniq` without the sort, since uniq just removes consecutive"
     "\nduplicates so it just needs to keep a single line in memory."
-    "\n"
-    "\nhuniq returns the input data in arbitrary order."
     "\n";
 }
 
-template<typename T>
-struct uniq_set : tsl::sparse_set<T> {
-  template<typename Arg>
-  void add(Arg&& arg) {
-    this->insert(std::forward<Arg>(arg));
-  }
-};
+typedef std::array<uint64_t, 2> murmurhash_t;
 
-template<typename T>
-struct count_uniq_set : tsl::sparse_map<T, size_t> {
-  template<typename Arg>
-  void add(Arg&& arg) {
-    auto r = this->try_emplace(std::forward<Arg>(arg), 0);
-    auto &pair  = *(std::get<0>(r));
-    auto &count = const_cast<size_t&>(std::get<1>(pair));
-    // TODO: Why is the const_cast necessary?
-    count++;
+struct murmuridentity_64 {
+  size_t operator()(const murmurhash_t &v) const {
+    return v[0];
   }
 };
 
@@ -67,12 +67,37 @@ std::ostream& operator<<(std::ostream& os, const std::pair<std::string, size_t> 
   return os;
 }
 
-template<typename Range>
-void uniq(Range &&r) {
+void uniq() {
+  tsl::sparse_set<murmurhash_t, murmuridentity_64> set;
+
   std::string el;
-  while (std::getline(std::cin, el)) r.add(std::move(el));
+  murmurhash_t hash;
+  while (std::getline(std::cin, el)) {
+    // NOTE: We have to use a decent hash function, because we
+    // will be using the entropy that is in the hash for collision
+    // detection.
+    // It has to be 128 bits because of the birthday problem.
+    MetroHash128::Hash((const uint8_t*)el.data(), el.size(), (uint8_t*)hash.data());
+    auto res = set.insert(hash);
+    if (std::get<1>(res))
+      std::cout << el << '\n';
+  }
+}
+
+void uniq_count() {
+  std::string el;
+  tsl::sparse_map<std::string, size_t> map;
+
+  while (std::getline(std::cin, el)) {
+    auto r = map.try_emplace(std::move(el), 0);
+    auto &pair  = *(std::get<0>(r));
+    auto &count = const_cast<size_t&>(std::get<1>(pair));
+    // TODO: Why is the const_cast necessary?
+    count++;
+  }
   
-  for (auto &e : r) std::cout << e << "\n";
+  for (auto &e : map)
+    std::cout << e << '\n';
 }
 
 int main(int argc, char **argv) {
@@ -92,8 +117,8 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (count) uniq(count_uniq_set<std::string>{});
-  else       uniq(uniq_set<std::string>{});
+  if (count) uniq_count();
+  else uniq();
 
   return 0;
 }

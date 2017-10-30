@@ -1,3 +1,6 @@
 [submodule "vendor/tsl-sparse-map"]
 	path = vendor/tsl-sparse-map
 	url = https://github.com/Tessil/sparse-map
+[submodule "vendor/metrohash"]
+	path = vendor/metrohash
+	url = https://github.com/jandrewrogers/MetroHash

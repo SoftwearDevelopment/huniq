@@ -1,7 +1,7 @@
 # huniq
 
-Simplified version of the uniq(1) tool, that uses a hash
-table internally to remove and count duplicates.
+Simplified version of the basic usages ofuniq(1) and sort(1),
+that uses a hash table internally to remove and count duplicates.
 
 # usage
 
@@ -13,28 +13,37 @@ counted.
 
 # why?
 
-This is useful for replacing the `sort | uniq -c` or `sort -u`
-pattern in cases where the input is large (possibly larger than ram)
-but the uniqed output is mach smaller:
+This is useful for replacing the `sort | uniq -c`, `sort | uniq` or `sort -u`
+in cases where sorting is not required.
 
-The sort step above needs to load the entire input data into
-memory, so the amount of memory is roughly equal to the size
-of the input data. huniq already deduplicates the data in
-memory, so it's memory requirement is roughly equal to that
-of the deduped output.
+`huniq -c` and `huniq` are both generally faster and use less memory than
+their counterparts, this is achieved by using a couple of optimizations:
 
-Huniq is usually also faster than `sort -u` when there are many
-duplicates.
+A hash table is used to store duplicates instead of sorting the input;
+this increases performance, since hashing is usually faster than sorting.
+It also means that duplicates do not have to be stored individually (they
+all occupy the same hash bucket), so the memory requirements grow with the
+size of the output and not the input. E.g. if each line in the input has a
+one duplicate at average, we need 50% less memory.
+
+`huniq` also does not store the actual lines themselves, instead it just stores
+a hash value (16 byte each) of that line. This is especially very useful when very
+long lines are in the input.
+
+`huniq` outputs lines in the order they where given, while `huniq -c` returns lines
+in arbitrary order.
+
+huniq does not swap data to disk like gnu sort does, so for that reason it sometimes
+also uses more memory than sort, especially when there are many items and not many duplicates.
 
 Note that huniq generally has no advantage to just using
 `uniq` without the sort, since uniq just removes consecutive
 duplicates so it just needs to keep a single line in memory.
 
-huniq returns the input data in arbitrary order.
-
 # building
 
-Just type `make`. Move the resulting binary to a place of
+Download the submodules (`git submodule init && git submodule update`)
+and then just type `make`. Move the resulting binary to a place of
 your choosing in order to install.
 
 # LICENSE
